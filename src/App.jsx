@@ -3,6 +3,9 @@ import { client } from "./client";
 import { shuffleArray } from "./utils/helpers";
 import GalleryCard from "./components/GalleryCard";
 import ItemDetail from "./components/ItemDetail";
+import { syncSanityToPinecone } from "./utils/syncData";
+// 🔥 IMPORT BARU UNTUK AI:
+import { imageToVector, searchSimilarOutfits } from "./utils/aiSearch";
 
 const CATEGORIES = ["All", "Man", "Woman"];
 
@@ -15,6 +18,15 @@ export default function App() {
   // --- STATE BARU: Untuk kontrol layar loading estetik ---
   const [isAppLoading, setIsAppLoading] = useState(true);
 
+  // --- STATE BARU: Untuk hasil pencarian AI ---
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiResults, setAiResults] = useState(null);
+
+  useEffect(() => {
+    // Mesin sinkronisasi dimatikan karena gudang sudah terisi
+    // syncSanityToPinecone();
+  }, []);
+
   const handleSelectItem = (item) => {
     setSelectedItem(item);
     window.history.pushState({}, "", `?id=${item._id}`);
@@ -25,29 +37,66 @@ export default function App() {
     window.history.pushState({}, "", window.location.pathname);
   };
 
-  // --- FUNGSI BARU: Untuk menangani klik tag ---
   const handleTagClick = (tag) => {
-    setSearchQuery(tag); // Isi otomatis kolom pencarian dengan nama tag
-    setSelectedItem(null); // Tutup tampilan detail
-    window.history.pushState({}, "", window.location.pathname); // Bersihkan URL
-    window.scrollTo({ top: 0, behavior: "smooth" }); // Scroll mulus ke atas
+    setSearchQuery(tag);
+    setSelectedItem(null);
+    window.history.pushState({}, "", window.location.pathname);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // --- FUNGSI BARU: Logika Pencarian AI by Camera ---
+  const handleImageSearch = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      setIsAiLoading(true);
+      setAiResults(null);
+      setActiveFilter("All");
+      setSearchQuery("");
+
+      // 1. Ubah gambar jadi URL sementara
+      const imageUrl = URL.createObjectURL(file);
+
+      // 2. Suruh AI mengubah gambar jadi Vektor
+      const vector = await imageToVector(imageUrl);
+
+      // 3. Lempar angkanya ke Pinecone
+      const matches = await searchSimilarOutfits(vector);
+
+      // 4. Cocokkan ID dari Pinecone dengan data Sanity
+      const matchedIds = matches.map((match) => match.id);
+      const matchedOutfits = matchedIds
+        .map((id) => outfits.find((o) => o._id === id))
+        .filter(Boolean);
+
+      setAiResults(matchedOutfits);
+    } catch (error) {
+      console.error("Waduh, AI-nya gagal menganalisa:", error);
+      alert("Pencarian gambar gagal. Coba cek console ya!");
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  // --- FUNGSI BARU: Hapus Hasil AI ---
+  const clearAiSearch = () => {
+    setAiResults(null);
+    document.getElementById("ai-image-upload").value = "";
   };
 
   // --- 1. EFFECT PERTAMA: Ambil data dari Sanity ---
   useEffect(() => {
     const fetchOutfits = async () => {
       try {
-        // AMBIL DATA & URUTKAN BERDASARKAN WAKTU UPLOAD
         const query = '*[_type == "outfit"] | order(_createdAt asc)';
         const rawData = await client.fetch(query);
 
-        // KUNCI VOL PATEN
         const dataWithVol = rawData.map((item, i) => ({
           ...item,
           volNumber: String(i + 1).padStart(2, "0"),
         }));
 
-        // Acak posisi
         const randomizedData = shuffleArray(dataWithVol);
         setOutfits(randomizedData);
 
@@ -60,13 +109,12 @@ export default function App() {
           if (foundItem) setSelectedItem(foundItem);
         }
 
-        // --- LOGIKA LOADING: Jeda sinematik 1.5 detik setelah data ditarik ---
         setTimeout(() => {
           setIsAppLoading(false);
         }, 1000);
       } catch (error) {
         console.error("Gagal menarik data dari Sanity:", error);
-        setIsAppLoading(false); // Tetap hilangkan layar loading kalau internet error
+        setIsAppLoading(false);
       }
     };
     fetchOutfits();
@@ -109,7 +157,7 @@ export default function App() {
 
   return (
     <>
-      {/* --- LAYAR LOADING EDITORIAL (100% Tailwind) --- */}
+      {/* --- LAYAR LOADING EDITORIAL --- */}
       <div
         className={`fixed inset-0 z-[9999] bg-[#F5F4F1] flex flex-col items-center justify-center transition-all duration-[1500ms] ease-in-out ${
           isAppLoading ? "opacity-100 visible" : "opacity-0 invisible"
@@ -145,7 +193,7 @@ export default function App() {
             allOutfits={outfits}
             onBack={handleBack}
             onSelect={handleSelectItem}
-            onTagClick={handleTagClick} // <--- SUDAH DISAMBUNGKAN KE ITEMDETAIL
+            onTagClick={handleTagClick}
           />
         ) : (
           <>
@@ -168,28 +216,91 @@ export default function App() {
             </nav>
 
             <div className="max-w-md mx-auto px-6 mb-12">
-              <input
-                type="text"
-                placeholder="Search archive (e.g. flannel, 41)..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent border-b border-stone-300 py-3 text-stone-900 font-mono text-[10px] uppercase tracking-widest focus:outline-none focus:border-stone-900 transition-colors text-center placeholder:text-stone-400"
-              />
+              <div className="flex items-center gap-3 border-b border-stone-300 py-2 transition-colors focus-within:border-stone-900">
+                <input
+                  type="text"
+                  placeholder="Search archive (e.g. flannel, 41)..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-transparent text-stone-900 font-mono text-[10px] uppercase tracking-widest focus:outline-none text-center placeholder:text-stone-400"
+                />
+
+                {/* Tombol Kamera AI */}
+                <button
+                  onClick={() =>
+                    document.getElementById("ai-image-upload").click()
+                  }
+                  className="text-stone-400 hover:text-stone-900 transition-colors p-1"
+                  title="Search by Image"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                    <circle cx="12" cy="13" r="3" />
+                  </svg>
+                </button>
+
+                {/* Input File Tersembunyi */}
+                <input
+                  type="file"
+                  id="ai-image-upload"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageSearch}
+                />
+              </div>
             </div>
 
             <main className="max-w-7xl mx-auto px-4 md:px-10 pb-32">
-              <div className="columns-3 lg:columns-4 gap-2 md:gap-8 space-y-2 md:space-y-8">
-                {filteredData.map((item, index) => (
-                  <GalleryCard
-                    key={item._id}
-                    item={item}
-                    index={index}
-                    onImageClick={handleSelectItem}
-                  />
-                ))}
-              </div>
+              {/* --- INDIKATOR LOADING AI --- */}
+              {isAiLoading && (
+                <div className="text-center py-20 animate-pulse">
+                  <p className="font-mono text-xs text-stone-900 uppercase tracking-widest font-bold">
+                    [ AI is scanning the archive... ]
+                  </p>
+                </div>
+              )}
 
-              {filteredData.length === 0 && (
+              {/* --- TOMBOL HAPUS HASIL AI --- */}
+              {aiResults && !isAiLoading && (
+                <div className="flex flex-col items-center mb-8">
+                  <p className="font-mono text-xs text-stone-500 uppercase tracking-widest mb-3">
+                    Showing visually similar items
+                  </p>
+                  <button
+                    onClick={clearAiSearch}
+                    className="text-[10px] font-mono border border-stone-900 px-4 py-1.5 uppercase tracking-widest hover:bg-stone-900 hover:text-[#F5F4F1] transition-colors"
+                  >
+                    Clear AI Search
+                  </button>
+                </div>
+              )}
+
+              {/* --- RENDER GALLERY KARTU BAJU --- */}
+              {!isAiLoading && (
+                <div className="columns-3 lg:columns-4 gap-2 md:gap-8 space-y-2 md:space-y-8">
+                  {(aiResults || filteredData).map((item, index) => (
+                    <GalleryCard
+                      key={item._id}
+                      item={item}
+                      index={index}
+                      onImageClick={handleSelectItem}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* --- PESAN KALAU KOSONG --- */}
+              {!isAiLoading && (aiResults || filteredData).length === 0 && (
                 <div className="text-center py-20">
                   <p className="font-mono text-xs text-stone-400 uppercase tracking-widest italic">
                     No items match your criteria.
