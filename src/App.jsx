@@ -1,13 +1,40 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { client } from "./client";
 import { shuffleArray } from "./utils/helpers";
 import GalleryCard from "./components/GalleryCard";
 import ItemDetail from "./components/ItemDetail";
 import { syncSanityToPinecone } from "./utils/syncData";
-// 🔥 IMPORT BARU UNTUK AI:
 import { imageToVector, searchSimilarOutfits } from "./utils/aiSearch";
 
+// --- IMPORT BARU: Library Color Picker Modern ---
+import { HexColorPicker } from "react-colorful";
+
 const CATEGORIES = ["All", "Man", "Woman"];
+
+const hexToRgb = (hex) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16),
+      }
+    : null;
+};
+
+const isColorSimilar = (color1, color2, threshold = 90) => {
+  if (!color1 || !color2) return false;
+  const rgb1 = hexToRgb(color1);
+  const rgb2 = hexToRgb(color2);
+  if (!rgb1 || !rgb2) return false;
+
+  const rDiff = rgb1.r - rgb2.r;
+  const gDiff = rgb1.g - rgb2.g;
+  const bDiff = rgb1.b - rgb2.b;
+
+  const distance = Math.sqrt(rDiff * rDiff + gDiff * gDiff + bDiff * bDiff);
+  return distance < threshold;
+};
 
 export default function App() {
   const [outfits, setOutfits] = useState([]);
@@ -15,16 +42,30 @@ export default function App() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // --- STATE BARU: Untuk kontrol layar loading estetik ---
-  const [isAppLoading, setIsAppLoading] = useState(true);
+  const [activeColor, setActiveColor] = useState("");
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const colorPickerRef = useRef(null);
 
-  // --- STATE BARU: Untuk hasil pencarian AI ---
+  const [isAppLoading, setIsAppLoading] = useState(true);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiResults, setAiResults] = useState(null);
 
   useEffect(() => {
-    // Mesin sinkronisasi dimatikan karena gudang sudah terisi
     // syncSanityToPinecone();
+  }, []);
+
+  // --- LOGIKA BARU: Menutup color picker saat klik di luar area ---
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        colorPickerRef.current &&
+        !colorPickerRef.current.contains(event.target)
+      ) {
+        setShowColorPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleSelectItem = (item) => {
@@ -44,7 +85,6 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // --- FUNGSI BARU: Logika Pencarian AI by Camera ---
   const handleImageSearch = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -54,17 +94,12 @@ export default function App() {
       setAiResults(null);
       setActiveFilter("All");
       setSearchQuery("");
+      setActiveColor("");
 
-      // 1. Ubah gambar jadi URL sementara
       const imageUrl = URL.createObjectURL(file);
-
-      // 2. Suruh AI mengubah gambar jadi Vektor
       const vector = await imageToVector(imageUrl);
-
-      // 3. Lempar angkanya ke Pinecone
       const matches = await searchSimilarOutfits(vector);
 
-      // 4. Cocokkan ID dari Pinecone dengan data Sanity
       const matchedIds = matches.map((match) => match.id);
       const matchedOutfits = matchedIds
         .map((id) => outfits.find((o) => o._id === id))
@@ -72,20 +107,18 @@ export default function App() {
 
       setAiResults(matchedOutfits);
     } catch (error) {
-      console.error("Waduh, AI-nya gagal menganalisa:", error);
-      alert("Pencarian gambar gagal. Coba cek console ya!");
+      console.error("Kesalahan analisis AI:", error);
+      alert("Pencarian gambar gagal.");
     } finally {
       setIsAiLoading(false);
     }
   };
 
-  // --- FUNGSI BARU: Hapus Hasil AI ---
   const clearAiSearch = () => {
     setAiResults(null);
     document.getElementById("ai-image-upload").value = "";
   };
 
-  // --- 1. EFFECT PERTAMA: Ambil data dari Sanity ---
   useEffect(() => {
     const fetchOutfits = async () => {
       try {
@@ -120,7 +153,6 @@ export default function App() {
     fetchOutfits();
   }, []);
 
-  // --- 2. EFFECT KEDUA: Pantau URL ---
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
@@ -137,27 +169,29 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [outfits]);
 
-  // --- 3. LOGIKA FILTER & PENCARIAN ---
   const filteredData = outfits.filter((item) => {
     const matchCategory =
       activeFilter === "All" ||
       item.category?.toLowerCase() === activeFilter.toLowerCase();
 
     const searchLower = searchQuery.toLowerCase();
-
     const matchSearch =
       searchQuery === "" ||
       item.title?.toLowerCase().includes(searchLower) ||
+      (item.dominantColor &&
+        item.dominantColor.toLowerCase().includes(searchLower)) ||
       (item.volNumber && item.volNumber.includes(searchQuery)) ||
       (item.tags &&
         item.tags.some((tag) => tag.toLowerCase().includes(searchLower)));
 
-    return matchCategory && matchSearch;
+    const matchColor =
+      activeColor === "" || isColorSimilar(item.dominantColor, activeColor);
+
+    return matchCategory && matchSearch && matchColor;
   });
 
   return (
     <>
-      {/* --- LAYAR LOADING EDITORIAL --- */}
       <div
         className={`fixed inset-0 z-[9999] bg-[#F5F4F1] flex flex-col items-center justify-center transition-all duration-[1500ms] ease-in-out ${
           isAppLoading ? "opacity-100 visible" : "opacity-0 invisible"
@@ -172,7 +206,6 @@ export default function App() {
         </p>
       </div>
 
-      {/* --- KONTEN UTAMA WEBSITE --- */}
       <div className="min-h-screen bg-[#F5F4F1] text-stone-900">
         <header className="pt-20 pb-12 px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
           <h1
@@ -215,7 +248,7 @@ export default function App() {
               </div>
             </nav>
 
-            <div className="max-w-md mx-auto px-6 mb-12">
+            <div className="max-w-md mx-auto px-6 mb-6">
               <div className="flex items-center gap-3 border-b border-stone-300 py-2 transition-colors focus-within:border-stone-900">
                 <input
                   type="text"
@@ -225,7 +258,6 @@ export default function App() {
                   className="w-full bg-transparent text-stone-900 font-mono text-[10px] uppercase tracking-widest focus:outline-none text-center placeholder:text-stone-400"
                 />
 
-                {/* Tombol Kamera AI */}
                 <button
                   onClick={() =>
                     document.getElementById("ai-image-upload").click()
@@ -249,7 +281,6 @@ export default function App() {
                   </svg>
                 </button>
 
-                {/* Input File Tersembunyi */}
                 <input
                   type="file"
                   id="ai-image-upload"
@@ -260,8 +291,58 @@ export default function App() {
               </div>
             </div>
 
+            {/* --- UI BARU: react-colorful Popover --- */}
+            {!isAiLoading && !aiResults && (
+              <div
+                className="max-w-xl mx-auto px-6 mb-12 flex flex-col items-center justify-center gap-3 relative"
+                ref={colorPickerRef}
+              >
+                <div className="flex items-center gap-4">
+                  <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-stone-500">
+                    Filter by Color:
+                  </span>
+
+                  {/* Tombol Pemicu Color Picker */}
+                  <button
+                    onClick={() => setShowColorPicker(!showColorPicker)}
+                    className="w-6 h-6 rounded-full border border-stone-300 shadow-sm transition-transform hover:scale-110 focus:outline-none"
+                    style={{
+                      background:
+                        activeColor ||
+                        "conic-gradient(from 90deg, red, yellow, lime, aqua, blue, magenta, red)",
+                    }}
+                    title="Open Color Picker"
+                  />
+                </div>
+
+                {/* Panel Color Picker (Tampil saat showColorPicker bernilai true) */}
+                {showColorPicker && (
+                  <div className="absolute top-10 z-50 p-4 bg-[#F5F4F1] border border-stone-300 shadow-xl rounded-sm">
+                    <HexColorPicker
+                      color={activeColor || "#000000"}
+                      onChange={setActiveColor}
+                    />
+
+                    <div className="mt-4 flex justify-between items-center border-t border-stone-300/50 pt-3">
+                      <span className="font-mono text-[10px] text-stone-500 uppercase">
+                        {activeColor || "#000000"}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setActiveColor("");
+                          setShowColorPicker(false);
+                        }}
+                        className="text-[9px] font-mono border border-stone-900 px-3 py-1 uppercase tracking-widest text-stone-900 hover:bg-stone-900 hover:text-[#F5F4F1] transition-all"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <main className="max-w-7xl mx-auto px-4 md:px-10 pb-32">
-              {/* --- INDIKATOR LOADING AI --- */}
               {isAiLoading && (
                 <div className="text-center py-20 animate-pulse">
                   <p className="font-mono text-xs text-stone-900 uppercase tracking-widest font-bold">
@@ -270,7 +351,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* --- TOMBOL HAPUS HASIL AI --- */}
               {aiResults && !isAiLoading && (
                 <div className="flex flex-col items-center mb-8">
                   <p className="font-mono text-xs text-stone-500 uppercase tracking-widest mb-3">
@@ -285,7 +365,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* --- RENDER GALLERY KARTU BAJU --- */}
               {!isAiLoading && (
                 <div className="columns-3 lg:columns-4 gap-2 md:gap-8 space-y-2 md:space-y-8">
                   {(aiResults || filteredData).map((item, index) => (
@@ -299,7 +378,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* --- PESAN KALAU KOSONG --- */}
               {!isAiLoading && (aiResults || filteredData).length === 0 && (
                 <div className="text-center py-20">
                   <p className="font-mono text-xs text-stone-400 uppercase tracking-widest italic">
