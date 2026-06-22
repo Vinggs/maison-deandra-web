@@ -167,7 +167,7 @@
 
   &::before,
   &::after {
-    content: '';
+    content: "";
     position: absolute;
     top: -4.5px;
     border: 5px solid transparent;
@@ -192,13 +192,15 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: #F5F4F1; /* Warna cream khas old money */
+  background-color: #f5f4f1; /* Warna cream khas old money */
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  transition: opacity 1.2s ease-in-out, visibility 1.2s ease-in-out;
+  transition:
+    opacity 1.2s ease-in-out,
+    visibility 1.2s ease-in-out;
 }
 
 /* Class ini yang akan menghilangkan layarnya perlahan */
@@ -208,7 +210,7 @@
 }
 
 .loader-title {
-  font-family: 'Times New Roman', serif; /* Font serif elegan */
+  font-family: "Times New Roman", serif; /* Font serif elegan */
   font-weight: 300;
   letter-spacing: 0.25em;
   font-size: 2rem;
@@ -227,6 +229,19 @@
 
 /* Efek teks bernapas (terang-redup) */
 @keyframes pulseFade {
-  0% { opacity: 0.4; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Hilangin Scrollbar khusus buat div yang ada class hide-scrollbar */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

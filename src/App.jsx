@@ -3,11 +3,11 @@ import { client } from "./client";
 import { shuffleArray } from "./utils/helpers";
 import GalleryCard from "./components/GalleryCard";
 import ItemDetail from "./components/ItemDetail";
+import ScrollCard from "./components/ScrollCard";
 import { syncSanityToPinecone } from "./utils/syncData";
 import { imageToVector, searchSimilarOutfits } from "./utils/aiSearch";
-
-// --- IMPORT BARU: Library Color Picker Modern ---
 import { HexColorPicker } from "react-colorful";
+import { PaginationBasic } from "./components/ui/ThePagination";
 
 const CATEGORIES = ["All", "Man", "Woman"];
 
@@ -36,6 +36,64 @@ const isColorSimilar = (color1, color2, threshold = 90) => {
   return distance < threshold;
 };
 
+const LiveClock = () => {
+  const [time, setTime] = useState(new Date());
+  const [zone, setZone] = useState("JKT");
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formattedTime = time
+    .toLocaleTimeString("en-US", {
+      timeZone: zone === "JKT" ? "Asia/Jakarta" : "Europe/Paris",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+    .toLowerCase()
+    .replace(" ", "");
+
+  return (
+    <div className="fixed top-6 right-6 md:top-8 md:right-8 z-50 flex items-center gap-3">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setZone("JKT")}
+          className={`font-mono text-[9px] uppercase tracking-widest transition-all relative pb-0.5 ${
+            zone === "JKT"
+              ? "text-stone-900 font-bold"
+              : "text-stone-400 hover:text-stone-600"
+          }`}
+        >
+          JKT
+          {zone === "JKT" && (
+            <span className="absolute bottom-0 left-0 w-full h-[1.5px] bg-stone-900"></span>
+          )}
+        </button>
+        <span className="font-mono text-stone-300 text-[9px]">/</span>
+        <button
+          onClick={() => setZone("PAR")}
+          className={`font-mono text-[9px] uppercase tracking-widest transition-all relative pb-0.5 ${
+            zone === "PAR"
+              ? "text-stone-900 font-bold"
+              : "text-stone-400 hover:text-stone-600"
+          }`}
+        >
+          PAR
+          {zone === "PAR" && (
+            <span className="absolute bottom-0 left-0 w-full h-[1.5px] bg-stone-900"></span>
+          )}
+        </button>
+      </div>
+      <div className="w-[1px] h-3 bg-stone-300"></div>
+      <span className="text-stone-900 font-mono text-[10px] tracking-widest font-bold w-[45px] text-right">
+        {formattedTime}
+      </span>
+    </div>
+  );
+};
+
 export default function App() {
   const [outfits, setOutfits] = useState([]);
   const [activeFilter, setActiveFilter] = useState("All");
@@ -46,15 +104,20 @@ export default function App() {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const colorPickerRef = useRef(null);
 
+  const [viewMode, setViewMode] = useState("grid");
+
   const [isAppLoading, setIsAppLoading] = useState(true);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiResults, setAiResults] = useState(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 24;
 
   useEffect(() => {
     // syncSanityToPinecone();
   }, []);
 
-  // --- LOGIKA BARU: Menutup color picker saat klik di luar area ---
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -81,6 +144,7 @@ export default function App() {
   const handleTagClick = (tag) => {
     setSearchQuery(tag);
     setSelectedItem(null);
+    setCurrentPage(1);
     window.history.pushState({}, "", window.location.pathname);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -95,6 +159,7 @@ export default function App() {
       setActiveFilter("All");
       setSearchQuery("");
       setActiveColor("");
+      setCurrentPage(1);
 
       const imageUrl = URL.createObjectURL(file);
       const vector = await imageToVector(imageUrl);
@@ -116,6 +181,7 @@ export default function App() {
 
   const clearAiSearch = () => {
     setAiResults(null);
+    setCurrentPage(1);
     document.getElementById("ai-image-upload").value = "";
   };
 
@@ -142,9 +208,7 @@ export default function App() {
           if (foundItem) setSelectedItem(foundItem);
         }
 
-        setTimeout(() => {
-          setIsAppLoading(false);
-        }, 1000);
+        setTimeout(() => setIsAppLoading(false), 1000);
       } catch (error) {
         console.error("Gagal menarik data dari Sanity:", error);
         setIsAppLoading(false);
@@ -164,7 +228,6 @@ export default function App() {
         if (foundItem) setSelectedItem(foundItem);
       }
     };
-
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, [outfits]);
@@ -173,7 +236,6 @@ export default function App() {
     const matchCategory =
       activeFilter === "All" ||
       item.category?.toLowerCase() === activeFilter.toLowerCase();
-
     const searchLower = searchQuery.toLowerCase();
     const matchSearch =
       searchQuery === "" ||
@@ -183,12 +245,17 @@ export default function App() {
       (item.volNumber && item.volNumber.includes(searchQuery)) ||
       (item.tags &&
         item.tags.some((tag) => tag.toLowerCase().includes(searchLower)));
-
     const matchColor =
       activeColor === "" || isColorSimilar(item.dominantColor, activeColor);
-
     return matchCategory && matchSearch && matchColor;
   });
+
+  const dataToDisplay = aiResults || filteredData;
+  const totalPages = Math.ceil(dataToDisplay.length / ITEMS_PER_PAGE);
+  const currentData = dataToDisplay.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
 
   return (
     <>
@@ -206,7 +273,9 @@ export default function App() {
         </p>
       </div>
 
-      <div className="min-h-screen bg-[#F5F4F1] text-stone-900">
+      <div className="min-h-screen bg-[#F5F4F1] text-stone-900 relative">
+        {!selectedItem && <LiveClock />}
+
         <header className="pt-20 pb-12 px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
           <h1
             className="text-5xl md:text-8xl font-display uppercase tracking-tighter text-stone-900 leading-[0.9] mb-4 cursor-pointer hover:opacity-70 transition-opacity"
@@ -235,7 +304,10 @@ export default function App() {
                 {CATEGORIES.map((cat) => (
                   <button
                     key={cat}
-                    onClick={() => setActiveFilter(cat)}
+                    onClick={() => {
+                      setActiveFilter(cat);
+                      setCurrentPage(1);
+                    }}
                     className={`font-mono text-[11px] uppercase tracking-widest transition-all relative pb-1
                     ${activeFilter === cat ? "text-stone-900 font-bold" : "text-stone-400 hover:text-stone-600"}`}
                   >
@@ -248,38 +320,69 @@ export default function App() {
               </div>
             </nav>
 
-            <div className="max-w-md mx-auto px-6 mb-6">
+            <div
+              className="max-w-md mx-auto px-6 mb-8 relative"
+              ref={colorPickerRef}
+            >
               <div className="flex items-center gap-3 border-b border-stone-300 py-2 transition-colors focus-within:border-stone-900">
                 <input
                   type="text"
                   placeholder="Search archive (e.g. flannel, 41)..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-transparent text-stone-900 font-mono text-[10px] uppercase tracking-widest focus:outline-none text-center placeholder:text-stone-400"
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full bg-transparent text-stone-900 font-mono text-[10px] uppercase tracking-widest focus:outline-none placeholder:text-stone-400"
                 />
 
-                <button
-                  onClick={() =>
-                    document.getElementById("ai-image-upload").click()
-                  }
-                  className="text-stone-400 hover:text-stone-900 transition-colors p-1"
-                  title="Search by Image"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() =>
+                      document.getElementById("ai-image-upload").click()
+                    }
+                    className="text-stone-400 hover:text-stone-900 transition-colors"
+                    title="Visual Search"
                   >
-                    <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-                    <circle cx="12" cy="13" r="3" />
-                  </svg>
-                </button>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.2"
+                      strokeLinecap="square"
+                    >
+                      <path d="M6 8V6h2" />
+                      <path d="M18 8V6h-2" />
+                      <path d="M6 16v2h2" />
+                      <path d="M18 16v2h-2" />
+                      <rect x="10" y="10" width="4" height="4" />
+                    </svg>
+                  </button>
+
+                  <div className="w-[1px] h-3 bg-stone-300"></div>
+
+                  <button
+                    onClick={() => setShowColorPicker(!showColorPicker)}
+                    className="flex items-center justify-center transition-transform hover:scale-110 focus:outline-none"
+                    title="Filter by Color"
+                  >
+                    <div
+                      className={`w-[14px] h-[14px] rounded-full shadow-sm transition-all ${
+                        activeColor
+                          ? "border-none"
+                          : "border border-stone-300 opacity-80 hover:opacity-100"
+                      }`}
+                      style={{
+                        background:
+                          activeColor ||
+                          "conic-gradient(from 90deg, #d3b8ae, #e4d4c8, #d0d5ce, #b8c4d3, #c5b8d3, #d3b8ae)",
+                      }}
+                    />
+                  </button>
+                </div>
 
                 <input
                   type="file"
@@ -289,56 +392,68 @@ export default function App() {
                   onChange={handleImageSearch}
                 />
               </div>
+
+              {showColorPicker && (
+                <div className="absolute right-6 top-12 z-50 p-4 bg-[#F5F4F1] border border-stone-300 shadow-xl rounded-sm">
+                  <HexColorPicker
+                    color={activeColor || "#000000"}
+                    onChange={(color) => {
+                      setActiveColor(color);
+                      setCurrentPage(1);
+                    }}
+                  />
+                  <div className="mt-4 flex justify-between items-center border-t border-stone-300/50 pt-3">
+                    <span className="font-mono text-[10px] text-stone-500 uppercase">
+                      {activeColor || "#000000"}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setActiveColor("");
+                        setCurrentPage(1);
+                        setShowColorPicker(false);
+                      }}
+                      className="text-[9px] font-mono border border-stone-900 px-3 py-1 uppercase tracking-widest text-stone-900 hover:bg-stone-900 hover:text-[#F5F4F1] transition-all"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* --- UI BARU: react-colorful Popover --- */}
-            {!isAiLoading && !aiResults && (
-              <div
-                className="max-w-xl mx-auto px-6 mb-12 flex flex-col items-center justify-center gap-3 relative"
-                ref={colorPickerRef}
-              >
-                <div className="flex items-center gap-4">
-                  <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-stone-500">
-                    Filter by Color:
-                  </span>
-
-                  {/* Tombol Pemicu Color Picker */}
+            {!isAppLoading && !aiResults && (
+              <div className="max-w-xl mx-auto px-6 mb-12 flex justify-center">
+                <div className="flex items-center gap-3">
                   <button
-                    onClick={() => setShowColorPicker(!showColorPicker)}
-                    className="w-6 h-6 rounded-full border border-stone-300 shadow-sm transition-transform hover:scale-110 focus:outline-none"
-                    style={{
-                      background:
-                        activeColor ||
-                        "conic-gradient(from 90deg, red, yellow, lime, aqua, blue, magenta, red)",
-                    }}
-                    title="Open Color Picker"
-                  />
+                    onClick={() => setViewMode("grid")}
+                    className={`font-mono text-[10px] uppercase tracking-[0.2em] transition-all relative pb-0.5 ${
+                      viewMode === "grid"
+                        ? "text-stone-900 font-bold"
+                        : "text-stone-400 hover:text-stone-600"
+                    }`}
+                  >
+                    Grid
+                    {viewMode === "grid" && (
+                      <span className="absolute bottom-0 left-0 w-full h-[1px] bg-stone-900"></span>
+                    )}
+                  </button>
+                  <span className="font-mono text-stone-300 text-[10px]">
+                    /
+                  </span>
+                  <button
+                    onClick={() => setViewMode("scroll")}
+                    className={`font-mono text-[10px] uppercase tracking-[0.2em] transition-all relative pb-0.5 ${
+                      viewMode === "scroll"
+                        ? "text-stone-900 font-bold"
+                        : "text-stone-400 hover:text-stone-600"
+                    }`}
+                  >
+                    Scroll
+                    {viewMode === "scroll" && (
+                      <span className="absolute bottom-0 left-0 w-full h-[1px] bg-stone-900"></span>
+                    )}
+                  </button>
                 </div>
-
-                {/* Panel Color Picker (Tampil saat showColorPicker bernilai true) */}
-                {showColorPicker && (
-                  <div className="absolute top-10 z-50 p-4 bg-[#F5F4F1] border border-stone-300 shadow-xl rounded-sm">
-                    <HexColorPicker
-                      color={activeColor || "#000000"}
-                      onChange={setActiveColor}
-                    />
-
-                    <div className="mt-4 flex justify-between items-center border-t border-stone-300/50 pt-3">
-                      <span className="font-mono text-[10px] text-stone-500 uppercase">
-                        {activeColor || "#000000"}
-                      </span>
-                      <button
-                        onClick={() => {
-                          setActiveColor("");
-                          setShowColorPicker(false);
-                        }}
-                        className="text-[9px] font-mono border border-stone-900 px-3 py-1 uppercase tracking-widest text-stone-900 hover:bg-stone-900 hover:text-[#F5F4F1] transition-all"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -365,20 +480,44 @@ export default function App() {
                 </div>
               )}
 
-              {!isAiLoading && (
-                <div className="columns-3 lg:columns-4 gap-2 md:gap-8 space-y-2 md:space-y-8">
-                  {(aiResults || filteredData).map((item, index) => (
-                    <GalleryCard
-                      key={item._id}
-                      item={item}
-                      index={index}
-                      onImageClick={handleSelectItem}
-                    />
-                  ))}
-                </div>
+              {!isAiLoading &&
+                dataToDisplay.length > 0 &&
+                (viewMode === "grid" ? (
+                  <div className="columns-3 lg:columns-4 gap-2 md:gap-8 space-y-2 md:space-y-8">
+                    {currentData.map((item, index) => (
+                      <GalleryCard
+                        key={item._id}
+                        item={item}
+                        index={index}
+                        onImageClick={handleSelectItem}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="snap-y snap-mandatory h-[80vh] w-full max-w-sm md:max-w-md mx-auto overflow-y-scroll hide-scrollbar bg-stone-900 rounded-sm border-[0.5px] border-stone-800">
+                    {currentData.map((item, index) => (
+                      <ScrollCard
+                        key={item._id}
+                        item={item}
+                        index={index}
+                        onImageClick={handleSelectItem}
+                      />
+                    ))}
+                  </div>
+                ))}
+
+              {!isAiLoading && dataToDisplay.length > 0 && (
+                <PaginationBasic
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={(page) => {
+                    setCurrentPage(page);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                />
               )}
 
-              {!isAiLoading && (aiResults || filteredData).length === 0 && (
+              {!isAiLoading && dataToDisplay.length === 0 && (
                 <div className="text-center py-20">
                   <p className="font-mono text-xs text-stone-400 uppercase tracking-widest italic">
                     No items match your criteria.
