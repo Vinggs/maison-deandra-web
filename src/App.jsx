@@ -3,11 +3,11 @@ import { client } from "./client";
 import { shuffleArray } from "./utils/helpers";
 import GalleryCard from "./components/GalleryCard";
 import ItemDetail from "./components/ItemDetail";
-import ScrollCard from "./components/ScrollCard";
 import { syncSanityToPinecone } from "./utils/syncData";
 import { imageToVector, searchSimilarOutfits } from "./utils/aiSearch";
 import { HexColorPicker } from "react-colorful";
 import { PaginationBasic } from "./components/ui/ThePagination";
+import LandingPage from "./components/LandingPage";
 
 const CATEGORIES = ["All", "Man", "Woman"];
 
@@ -104,13 +104,12 @@ export default function App() {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const colorPickerRef = useRef(null);
 
-  const [viewMode, setViewMode] = useState("grid");
-
   const [isAppLoading, setIsAppLoading] = useState(true);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiResults, setAiResults] = useState(null);
 
-  // Pagination State
+  const [hasEntered, setHasEntered] = useState(false);
+
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 24;
 
@@ -257,6 +256,17 @@ export default function App() {
     currentPage * ITEMS_PER_PAGE,
   );
 
+  if (!hasEntered) {
+    return (
+      <LandingPage
+        onEnter={() => {
+          window.scrollTo(0, 0);
+          setHasEntered(true);
+        }}
+      />
+    );
+  }
+
   return (
     <>
       <div
@@ -321,66 +331,109 @@ export default function App() {
             </nav>
 
             <div
-              className="max-w-md mx-auto px-6 mb-8 relative"
+              className="max-w-md mx-auto px-6 mb-12 relative"
               ref={colorPickerRef}
             >
               <div className="flex items-center gap-3 border-b border-stone-300 py-2 transition-colors focus-within:border-stone-900">
                 <input
                   type="text"
-                  placeholder="Search archive (e.g. flannel, 41)..."
+                  placeholder="Explore silhouettes, tones, or pieces..."
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full bg-transparent text-stone-900 font-mono text-[10px] uppercase tracking-widest focus:outline-none placeholder:text-stone-400"
+                  className="w-full bg-transparent text-stone-900 font-mono text-[10px] uppercase tracking-widest focus:outline-none placeholder:text-stone-400 transition-colors"
                 />
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-5">
+                  {/* Icon AI Visual Search (Lens Camera Style) */}
                   <button
                     onClick={() =>
                       document.getElementById("ai-image-upload").click()
                     }
-                    className="text-stone-400 hover:text-stone-900 transition-colors"
-                    title="Visual Search"
+                    className="group transition-all hover:scale-110"
+                    title="Visual AI Search"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      width="15"
-                      height="15"
+                      width="18"
+                      height="18"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
-                      strokeWidth="1.2"
-                      strokeLinecap="square"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-stone-400 group-hover:text-stone-900 transition-colors"
                     >
-                      <path d="M6 8V6h2" />
-                      <path d="M18 8V6h-2" />
-                      <path d="M6 16v2h2" />
-                      <path d="M18 16v2h-2" />
-                      <rect x="10" y="10" width="4" height="4" />
+                      <path d="M5 8V6a2 2 0 0 1 2-2h2" />
+                      <path d="M15 4h2a2 2 0 0 1 2 2v2" />
+                      <path d="M19 15v2a2 2 0 0 1-2 2h-2" />
+                      <path d="M9 20H7a2 2 0 0 1-2-2v-2" />
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="3"
+                        className="fill-amber-700 stroke-none opacity-70 group-hover:opacity-100 transition-opacity"
+                      />
+                      <circle
+                        cx="17.5"
+                        cy="17.5"
+                        r="1.5"
+                        className="fill-rose-700 stroke-none opacity-70 group-hover:opacity-100 transition-opacity"
+                      />
                     </svg>
                   </button>
 
+                  {/* Garis Pemisah */}
                   <div className="w-[1px] h-3 bg-stone-300"></div>
 
+                  {/* Icon Color Filter (RGB Circles Style) */}
                   <button
                     onClick={() => setShowColorPicker(!showColorPicker)}
-                    className="flex items-center justify-center transition-transform hover:scale-110 focus:outline-none"
+                    className={`group flex items-center justify-center transition-all hover:scale-110 focus:outline-none ${
+                      activeColor
+                        ? "text-stone-900"
+                        : "text-stone-400 hover:text-stone-900"
+                    }`}
                     title="Filter by Color"
                   >
-                    <div
-                      className={`w-[14px] h-[14px] rounded-full shadow-sm transition-all ${
-                        activeColor
-                          ? "border-none"
-                          : "border border-stone-300 opacity-80 hover:opacity-100"
-                      }`}
-                      style={{
-                        background:
-                          activeColor ||
-                          "conic-gradient(from 90deg, #d3b8ae, #e4d4c8, #d0d5ce, #b8c4d3, #c5b8d3, #d3b8ae)",
-                      }}
-                    />
+                    {activeColor ? (
+                      <div
+                        className="w-4 h-4 rounded-full border border-stone-300 shadow-sm"
+                        style={{ backgroundColor: activeColor }}
+                      />
+                    ) : (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        strokeWidth="1.5"
+                        className="opacity-70 group-hover:opacity-100 transition-opacity"
+                      >
+                        <circle
+                          cx="12"
+                          cy="9.5"
+                          r="4.5"
+                          className="stroke-rose-700"
+                        />
+                        <circle
+                          cx="8.5"
+                          cy="15.5"
+                          r="4.5"
+                          className="stroke-blue-700"
+                        />
+                        <circle
+                          cx="15.5"
+                          cy="15.5"
+                          r="4.5"
+                          className="stroke-emerald-700"
+                        />
+                      </svg>
+                    )}
                   </button>
                 </div>
 
@@ -421,42 +474,6 @@ export default function App() {
               )}
             </div>
 
-            {!isAppLoading && !aiResults && (
-              <div className="max-w-xl mx-auto px-6 mb-12 flex justify-center">
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    className={`font-mono text-[10px] uppercase tracking-[0.2em] transition-all relative pb-0.5 ${
-                      viewMode === "grid"
-                        ? "text-stone-900 font-bold"
-                        : "text-stone-400 hover:text-stone-600"
-                    }`}
-                  >
-                    Grid
-                    {viewMode === "grid" && (
-                      <span className="absolute bottom-0 left-0 w-full h-[1px] bg-stone-900"></span>
-                    )}
-                  </button>
-                  <span className="font-mono text-stone-300 text-[10px]">
-                    /
-                  </span>
-                  <button
-                    onClick={() => setViewMode("scroll")}
-                    className={`font-mono text-[10px] uppercase tracking-[0.2em] transition-all relative pb-0.5 ${
-                      viewMode === "scroll"
-                        ? "text-stone-900 font-bold"
-                        : "text-stone-400 hover:text-stone-600"
-                    }`}
-                  >
-                    Scroll
-                    {viewMode === "scroll" && (
-                      <span className="absolute bottom-0 left-0 w-full h-[1px] bg-stone-900"></span>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
             <main className="max-w-7xl mx-auto px-4 md:px-10 pb-32">
               {isAiLoading && (
                 <div className="text-center py-20 animate-pulse">
@@ -480,31 +497,18 @@ export default function App() {
                 </div>
               )}
 
-              {!isAiLoading &&
-                dataToDisplay.length > 0 &&
-                (viewMode === "grid" ? (
-                  <div className="columns-3 lg:columns-4 gap-2 md:gap-8 space-y-2 md:space-y-8">
-                    {currentData.map((item, index) => (
-                      <GalleryCard
-                        key={item._id}
-                        item={item}
-                        index={index}
-                        onImageClick={handleSelectItem}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="snap-y snap-mandatory h-[80vh] w-full max-w-sm md:max-w-md mx-auto overflow-y-scroll hide-scrollbar bg-stone-900 rounded-sm border-[0.5px] border-stone-800">
-                    {currentData.map((item, index) => (
-                      <ScrollCard
-                        key={item._id}
-                        item={item}
-                        index={index}
-                        onImageClick={handleSelectItem}
-                      />
-                    ))}
-                  </div>
-                ))}
+              {!isAiLoading && dataToDisplay.length > 0 && (
+                <div className="columns-3 lg:columns-4 gap-2 md:gap-8 space-y-2 md:space-y-8">
+                  {currentData.map((item, index) => (
+                    <GalleryCard
+                      key={item._id}
+                      item={item}
+                      index={index}
+                      onImageClick={handleSelectItem}
+                    />
+                  ))}
+                </div>
+              )}
 
               {!isAiLoading && dataToDisplay.length > 0 && (
                 <PaginationBasic
