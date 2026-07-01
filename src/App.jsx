@@ -287,13 +287,15 @@ export default function App() {
         {!selectedItem && <LiveClock />}
 
         <header className="pt-20 pb-12 px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
-          <h1
-            className="text-5xl md:text-8xl font-display uppercase tracking-tighter text-stone-900 leading-[0.9] mb-4 cursor-pointer hover:opacity-70 transition-opacity"
-            onClick={handleBack}
+          <a
+            href="/"
+            className="flex flex-col items-center text-center group cursor-pointer"
           >
-            Maison{" "}
-            <span className="text-stone-400 italic font-light">Deandra</span>
-          </h1>
+            <span className="font-display text-5xl md:text-8xl uppercase tracking-tighter text-stone-900 leading-[0.9] mb-4 hover:opacity-70 transition-opacity">
+              Maison{" "}
+              <span className="text-stone-400 italic font-light">Deandra</span>
+            </span>
+          </a>
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-stone-500">
             The Architecture of Aesthetics
           </p>
@@ -347,7 +349,6 @@ export default function App() {
                 />
 
                 <div className="flex items-center gap-5">
-                  {/* Icon AI Visual Search (Lens Camera Style) */}
                   <button
                     onClick={() =>
                       document.getElementById("ai-image-upload").click()
@@ -386,10 +387,8 @@ export default function App() {
                     </svg>
                   </button>
 
-                  {/* Garis Pemisah */}
                   <div className="w-[1px] h-3 bg-stone-300"></div>
 
-                  {/* Icon Color Filter (RGB Circles Style) */}
                   <button
                     onClick={() => setShowColorPicker(!showColorPicker)}
                     className={`group flex items-center justify-center transition-all hover:scale-110 focus:outline-none ${
