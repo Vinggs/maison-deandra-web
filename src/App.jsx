@@ -108,7 +108,11 @@ export default function App() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiResults, setAiResults] = useState(null);
 
-  const [hasEntered, setHasEntered] = useState(false);
+  const [hasEntered, setHasEntered] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("id")) return true;
+    return sessionStorage.getItem("maison_entered") === "true";
+  });
 
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 24;
@@ -262,6 +266,7 @@ export default function App() {
         onEnter={() => {
           window.scrollTo(0, 0);
           setHasEntered(true);
+          sessionStorage.setItem("maison_entered", "true");
         }}
       />
     );
@@ -271,7 +276,9 @@ export default function App() {
     <>
       <div
         className={`fixed inset-0 z-[9999] bg-[#F5F4F1] flex flex-col items-center justify-center transition-all duration-[1500ms] ease-in-out ${
-          isAppLoading ? "opacity-100 visible" : "opacity-0 invisible"
+          isAppLoading
+            ? "opacity-100 visible"
+            : "opacity-0 invisible pointer-events-none"
         }`}
       >
         <h1 className="font-display text-3xl md:text-5xl uppercase tracking-[0.2em] text-stone-900 animate-pulse">
@@ -308,6 +315,7 @@ export default function App() {
             onBack={handleBack}
             onSelect={handleSelectItem}
             onTagClick={handleTagClick}
+            isAppLoading={isAppLoading} // 🔥 PENTING: Oper status loading global ke ItemDetail
           />
         ) : (
           <>

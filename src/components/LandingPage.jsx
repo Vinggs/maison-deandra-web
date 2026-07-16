@@ -41,12 +41,13 @@ const LogoCarousel = () => {
 const FanCarousel = () => {
   const [isHovered, setIsHovered] = useState(false);
 
+  // OPTIMASI 1: Ganti w=1080 jadi w=400 & turunkan quality (q=80). Ini memangkas beban jaringan hingga 70%!
   const images = [
-    "https://cdn.sanity.io/images/7z000okv/production/64b9aa8a3a94aab2917a63ca0dd1e865e144b3d9-1080x1918.jpg?w=1080&q=100&auto=format",
-    "https://cdn.sanity.io/images/7z000okv/production/e2580f2cbcd47deee15c9823d8075a9a5d895fdc-1080x1918.jpg?w=1080&q=100&auto=format",
-    "https://cdn.sanity.io/images/7z000okv/production/487c48487e9835fceb2bf4c7ecad1f54bb71ae1d-1080x1918.jpg?w=1080&q=100&auto=format",
-    "https://cdn.sanity.io/images/7z000okv/production/9f0402ee80e087c786b0cadba5743f3c47f84e2e-1080x1918.jpg?w=1080&q=100&auto=format",
-    "https://cdn.sanity.io/images/7z000okv/production/bf3b47a31d7d4047c90ac17fd8a79004669cded4-1080x1918.jpg?w=1080&q=100&auto=format",
+    "https://cdn.sanity.io/images/7z000okv/production/64b9aa8a3a94aab2917a63ca0dd1e865e144b3d9-1080x1918.jpg?w=400&q=80&auto=format",
+    "https://cdn.sanity.io/images/7z000okv/production/e2580f2cbcd47deee15c9823d8075a9a5d895fdc-1080x1918.jpg?w=400&q=80&auto=format",
+    "https://cdn.sanity.io/images/7z000okv/production/487c48487e9835fceb2bf4c7ecad1f54bb71ae1d-1080x1918.jpg?w=400&q=80&auto=format",
+    "https://cdn.sanity.io/images/7z000okv/production/9f0402ee80e087c786b0cadba5743f3c47f84e2e-1080x1918.jpg?w=400&q=80&auto=format",
+    "https://cdn.sanity.io/images/7z000okv/production/bf3b47a31d7d4047c90ac17fd8a79004669cded4-1080x1918.jpg?w=400&q=80&auto=format",
   ];
 
   const transforms = [
@@ -68,7 +69,7 @@ const FanCarousel = () => {
         return (
           <motion.div
             key={i}
-            className="absolute w-36 md:w-48 aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl border border-stone-300/50 bg-stone-200 transform-gpu backface-hidden"
+            className="absolute w-36 md:w-48 aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl border border-stone-300/50 bg-stone-200 transform-gpu backface-hidden will-change-transform"
             initial={{ rotate: (i - 2) * 3, x: 0, y: 0 }}
             animate={{
               rotate: isHovered ? transforms[i].rotate : (i - 2) * 2,
@@ -85,6 +86,8 @@ const FanCarousel = () => {
             <img
               src={img}
               alt={`Archive item ${i + 1}`}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover transition-all duration-500"
             />
           </motion.div>
@@ -109,8 +112,8 @@ export default function LandingPage({ onEnter }) {
   };
 
   return (
-    <div className="bg-[#111111] min-h-screen selection:bg-[#F5F4F1] selection:text-stone-900 relative">
-      {/* 1. HEADER MINIMALIS (MICRO-COPY ATAS) */}
+    <div className="bg-[#111111] min-h-screen selection:bg-[#F5F4F1] selection:text-stone-900 relative overflow-x-hidden">
+      {/* 1. HEADER MINIMALIS */}
       <div className="fixed top-0 left-0 w-full p-6 md:p-10 flex justify-between items-start z-20 pointer-events-none mix-blend-difference text-white/70">
         <div className="font-mono text-[10px] uppercase tracking-[0.2em] leading-relaxed">
           <p>Maison Deandra</p>
@@ -122,12 +125,13 @@ export default function LandingPage({ onEnter }) {
         </div>
       </div>
 
-      {/* BACKGROUND SHADER */}
-      <div className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden pointer-events-none z-0">
+      {/* OPTIMASI 2: SHADER HANYA MUNCUL DI DESKTOP (hidden md:flex) */}
+      {/* Ini akan menyelamatkan GPU HP dari rendering blur 120px yang super berat */}
+      <div className="fixed inset-0 hidden md:flex flex-col items-center justify-center overflow-hidden pointer-events-none z-0">
         <motion.div
           animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[-10%] left-[-10%] w-[60vw] h-[60vw] bg-rose-900 rounded-full blur-[120px]"
+          className="absolute top-[-10%] left-[-10%] w-[60vw] h-[60vw] bg-rose-900 rounded-full blur-[120px] will-change-transform transform-gpu"
         />
         <motion.div
           animate={{ scale: [1, 1.4, 1], opacity: [0.15, 0.3, 0.15] }}
@@ -137,10 +141,12 @@ export default function LandingPage({ onEnter }) {
             ease: "easeInOut",
             delay: 2,
           }}
-          className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-amber-800 rounded-full blur-[120px]"
+          className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-amber-800 rounded-full blur-[120px] will-change-transform transform-gpu"
         />
+      </div>
 
-        {/* HERO TEXT - FOKUS UTAMA */}
+      {/* OPTIMASI 3: HERO TEXT DIPISAH DARI CONTAINER SHADER */}
+      <div className="fixed inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
         <div className="text-center text-[#F5F4F1] mb-20 relative z-10">
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
@@ -164,7 +170,6 @@ export default function LandingPage({ onEnter }) {
           <p>Curated Essentials</p>
         </div>
 
-        {/* Scroll Indicator Animasi */}
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 text-white/40 mix-blend-difference">
           <span className="font-mono text-[9px] uppercase tracking-[0.4em] origin-bottom -rotate-90 translate-y-[-20px]">
             Scroll
@@ -172,7 +177,7 @@ export default function LandingPage({ onEnter }) {
           <motion.div
             animate={{ y: [0, 10, 0], opacity: [0.3, 1, 0.3] }}
             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            className="w-[1px] h-12 bg-gradient-to-b from-white/80 to-transparent"
+            className="w-[1px] h-12 bg-gradient-to-b from-white/80 to-transparent transform-gpu"
           />
         </div>
       </div>
@@ -182,7 +187,7 @@ export default function LandingPage({ onEnter }) {
       {/* CONTAINER UTAMA (KONTEN BAWAH) */}
       <motion.div
         style={{ scale, borderRadius }}
-        className="relative z-20 bg-[#F5F4F1] text-stone-900 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] origin-bottom w-full min-h-screen pb-32"
+        className="relative z-20 bg-[#F5F4F1] text-stone-900 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] origin-bottom w-full min-h-screen pb-32 overflow-x-hidden"
       >
         <LogoCarousel />
 
@@ -252,6 +257,7 @@ export default function LandingPage({ onEnter }) {
                     loop
                     muted
                     playsInline
+                    preload="none"
                     className="w-full h-full object-cover scale-[1.31] origin-center"
                   />
                 </div>
