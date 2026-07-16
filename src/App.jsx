@@ -281,17 +281,14 @@ export default function App() {
             : "opacity-0 invisible pointer-events-none"
         }`}
       >
-        {/* Gunakan grid untuk memusatkan segalanya secara mutlak */}
-        <div className="grid h-screen w-screen place-items-center">
-          <div className="flex flex-col items-center">
-            <h1 className="font-display text-3xl md:text-5xl uppercase tracking-[0.2em] text-stone-900 animate-pulse">
-              Maison{" "}
-              <span className="italic font-light text-stone-400">Deandra</span>
-            </h1>
-            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-stone-500 mt-6">
-              L'Archive En Chargement...
-            </p>
-          </div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center text-center w-full px-4">
+          <h1 className="font-display text-3xl md:text-5xl uppercase tracking-[0.2em] text-stone-900 animate-pulse text-center w-full">
+            Maison{" "}
+            <span className="italic font-light text-stone-400">Deandra</span>
+          </h1>
+          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-stone-500 mt-6 text-center w-full">
+            L'Archive En Chargement...
+          </p>
         </div>
       </div>
 
