@@ -275,19 +275,22 @@ export default function App() {
   return (
     <>
       <div
-        className={`fixed inset-0 z-[9999] bg-[#F5F4F1] flex flex-col items-center justify-center transition-all duration-[1500ms] ease-in-out ${
+        className={`fixed inset-0 z-[9999] bg-[#F5F4F1] flex items-center justify-center transition-all duration-[1500ms] ease-in-out ${
           isAppLoading
             ? "opacity-100 visible"
             : "opacity-0 invisible pointer-events-none"
         }`}
+        style={{ height: "100vh", width: "100vw" }}
       >
-        <h1 className="font-display text-3xl md:text-5xl uppercase tracking-[0.2em] text-stone-900 animate-pulse">
-          Maison{" "}
-          <span className="italic font-light text-stone-400">Deandra</span>
-        </h1>
-        <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-stone-500 mt-6">
-          L'Archive En Chargement...
-        </p>
+        <div className="flex flex-col items-center justify-center">
+          <h1 className="font-display text-3xl md:text-5xl uppercase tracking-[0.2em] text-stone-900 animate-pulse">
+            Maison{" "}
+            <span className="italic font-light text-stone-400">Deandra</span>
+          </h1>
+          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-stone-500 mt-6">
+            L'Archive En Chargement...
+          </p>
+        </div>
       </div>
 
       <div className="min-h-screen bg-[#F5F4F1] text-stone-900 relative">
